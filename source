@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 
 -- Function to send a notification
 local function sendNotification(title, text, duration)
@@ -11,10 +12,10 @@ local function sendNotification(title, text, duration)
     })
 end
 
+-- Show the notification when the script is loaded
 sendNotification("Credits", "Joshuatszpock on GitHub", 3)
-local TeleportService = game:GetService("TeleportService")
 
- --Gui
+-- GUI
 local screenGui = Instance.new("ScreenGui")
 local frame = Instance.new("Frame")
 local timerLabel = Instance.new("TextLabel")
@@ -62,17 +63,6 @@ local isTimerRunning = true -- Set to true to start the timer
 local countdown = tonumber(timerInput.Text) or 30 -- Default countdown time
 local timerCoroutine -- Variable to hold the coroutine
 
--- Function to send a notification
-local function sendNotification(title, text)
-    local player = Players.LocalPlayer
-    player:WaitForChild("PlayerGui")
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = 5 -- Duration in seconds
-    })
-end
-
 -- Function to server hop
 local function serverHop()
     local placeId = game.PlaceId
@@ -92,7 +82,7 @@ local function serverHop()
         local serverToJoin = serversToJoin[math.random(1, #serversToJoin)] -- Randomly select a server
         TeleportService:TeleportToPlaceInstance(placeId, serverToJoin.id, Players.LocalPlayer) -- Join the selected server
     else
-        sendNotification("Script failed", "Cannot find an empty server.")
+        sendNotification("Script failed", "Cannot find an empty server.", 5)
     end
 end
 
