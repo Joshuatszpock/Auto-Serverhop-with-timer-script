@@ -1,130 +1,127 @@
 local Players = game:GetService("Players")
+local Http = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local Api = "https://games.roblox.com/v1/games/"
 
--- Function to send a notification
+local Player = Players.LocalPlayer
+local placeId, currentJobId = game.PlaceId, game.JobId
+local serverListUrl = Api .. placeId .. "/servers/Public?sortOrder=Asc&limit=10"
+local timeToWait = 30 -- Default time to wait in seconds
+
+-- Function to list servers
+local function ListServers(cursor)
+    local raw = game:HttpGet(serverListUrl .. ((cursor and "&cursor=" .. cursor) or ""))
+    return Http:JSONDecode(raw)
+end
+
 local function sendNotification(title, text, duration)
     local player = Players.LocalPlayer
     player:WaitForChild("PlayerGui")
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = title,
         Text = text,
-        Duration = duration -- Duration in seconds
+        Duration = duration
     })
 end
 
--- Show the notification when the script is loaded
 sendNotification("Credits", "Joshuatszpock on GitHub", 3)
 
--- GUI
+-- GUI setup
 local screenGui = Instance.new("ScreenGui")
 local frame = Instance.new("Frame")
 local timerLabel = Instance.new("TextLabel")
 local controlButton = Instance.new("TextButton")
 local timerInput = Instance.new("TextBox")
 
-screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+screenGui.Parent = Player:WaitForChild("PlayerGui")
 
 -- Frame properties
 frame.Parent = screenGui
 frame.Size = UDim2.new(0.3, 0, 0.4, 0)
 frame.Position = UDim2.new(0.5, -frame.Size.X.Offset / 2, 0.5, -frame.Size.Y.Offset / 2)
 frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-frame.BackgroundTransparency = 0.5 -- Set transparency to 0.5
-frame.BorderSizePixel = 0
+frame.BackgroundTransparency = 0.5
 
 -- Timer Label
 timerLabel.Parent = frame
 timerLabel.Size = UDim2.new(1, 0, 0.5, 0)
-timerLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- White text
+timerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 timerLabel.TextScaled = true
 timerLabel.BackgroundTransparency = 1
-timerLabel.Text = "30" -- Default countdown time
+timerLabel.Text = tostring(timeToWait) -- Set default timer text
 
 -- Timer Input
 timerInput.Parent = frame
 timerInput.Size = UDim2.new(1, 0, 0.2, 0)
 timerInput.Position = UDim2.new(0, 0, 0.5, 0)
-timerInput.TextColor3 = Color3.fromRGB(255, 255, 255) -- White text
-timerInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Gray background
+timerInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 timerInput.PlaceholderText = "Enter time in seconds"
 timerInput.TextScaled = true
-timerInput.Text = "30" -- Set default timer input to 30 seconds
+timerInput.Text = tostring(timeToWait) -- Set default input time
 
 -- Control Button
 controlButton.Parent = frame
 controlButton.Size = UDim2.new(1, 0, 0.3, 0)
 controlButton.Position = UDim2.new(0, 0, 0.7, 0)
-controlButton.Text = "Stop" -- Change to Stop since the timer starts activated
-controlButton.TextColor3 = Color3.fromRGB(255, 255, 255) -- White text
-controlButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red background
-controlButton.TextScaled = true
+controlButton.Text = "Stop"
+controlButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+controlButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
-local isTimerRunning = true -- Set to true to start the timer
-local countdown = tonumber(timerInput.Text) or 30 -- Default countdown time
-local timerCoroutine -- Variable to hold the coroutine
+local isTimerRunning = false
+local timerCoroutine
 
 -- Function to server hop
 local function serverHop()
-    local placeId = game.PlaceId
-    local currentServerId = game.JobId -- Get the current server ID
-    local availableServers = TeleportService:GetServerAsync(placeId) -- Get available servers
-
-    -- Filter out the current server
-    local serversToJoin = {}
-    for _, server in ipairs(availableServers) do
-        if server.id ~= currentServerId then
-            table.insert(serversToJoin, server)
+    while wait(timeToWait) do
+        -- Freeze player before teleporting to prevent issues
+        if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            Player.Character.HumanoidRootPart.Anchored = true
         end
-    end
 
-    -- Check if there are any servers to join
-    if #serversToJoin > 0 then
-        local serverToJoin = serversToJoin[math.random(1, #serversToJoin)] -- Randomly select a server
-        TeleportService:TeleportToPlaceInstance(placeId, serverToJoin.id, Players.LocalPlayer) -- Join the selected server
-    else
-        sendNotification("Script failed", "Cannot find an empty server.", 5)
+        local servers = ListServers()
+        if servers.data and #servers.data > 0 then
+            local server = servers.data[math.random(1, #servers.data)]
+            TeleportService:TeleportToPlaceInstance(placeId, server.id, Player)
+        else
+            sendNotification("Server Hop Failed", "No available servers to join.", 5)
+        end
     end
 end
 
 -- Timer function
 local function startTimer()
+    local countdown = timeToWait
+    isTimerRunning = true
     while countdown > 0 and isTimerRunning do
-        timerLabel.Text = tostring(countdown) -- Update the text label with the countdown
+        timerLabel.Text = tostring(countdown) -- Update the timer label
         task.wait(1) -- Wait for 1 second
         countdown = countdown - 1
     end
 
     if countdown <= 0 and isTimerRunning then
         timerLabel.Text = "Serverhopping!"
-        isTimerRunning = true -- Ensure the timer is running for server hopping
-        while isTimerRunning do
-            serverHop()
-            task.wait(0.1) -- Wait for 0.1 seconds before trying to hop again
-        end
+        serverHop() -- Call server hop function here after timer ends
     end
 end
-
--- Start the timer immediately in a coroutine
-timerCoroutine = coroutine.create(startTimer)
-coroutine.resume(timerCoroutine)
 
 -- Control Button functionality
 controlButton.MouseButton1Click:Connect(function()
     if isTimerRunning then
         isTimerRunning = false
         controlButton.Text = "Start"
-        controlButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Green background
+        controlButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     else
-        local inputTime = tonumber(timerInput.Text)
-        if inputTime and inputTime > 0 then
-            countdown = inputTime -- Set countdown to user input
-            isTimerRunning = true
-            controlButton.Text = "Stop"
-            controlButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red background
-            timerCoroutine = coroutine.create(startTimer) -- Create a new coroutine for the timer
-            coroutine.resume(timerCoroutine) -- Start the timer
-        else
-            timerLabel.Text = "Invalid time!"
+        timeToWait = tonumber(timerInput.Text) or timeToWait
+        if not timerCoroutine or coroutine.status(timerCoroutine) == "dead" then
+            timerCoroutine = coroutine.create(startTimer)
+            coroutine.resume(timerCoroutine)
         end
+        isTimerRunning = true
+        controlButton.Text = "Stop"
+        controlButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     end
 end)
+
+-- Start the timer immediately when the script is loaded
+startTimer()
