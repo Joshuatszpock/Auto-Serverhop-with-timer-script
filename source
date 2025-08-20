@@ -73,7 +73,7 @@ local timerCoroutine
 
 -- Function to server hop
 local function serverHop()
-    while wait(timeToWait) do
+    while true do -- Continuous loop to keep trying to hop servers
         -- Freeze player before teleporting to prevent issues
         if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
             Player.Character.HumanoidRootPart.Anchored = true
@@ -82,9 +82,20 @@ local function serverHop()
         local servers = ListServers()
         if servers.data and #servers.data > 0 then
             local server = servers.data[math.random(1, #servers.data)]
-            TeleportService:TeleportToPlaceInstance(placeId, server.id, Player)
+            local success, errorMessage = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, server.id, Player)
+            end)
+
+            if success then
+                timerLabel.text = "Successful! Joining server..."
+                break -- Exit the loop if teleportation is successful
+            else
+                timerLabel.text = "Failed. Retrying serverhop..."
+                task.wait(0.1) -- Wait before retrying
+            end
         else
             sendNotification("Server Hop Failed", "No available servers to join.", 5)
+            task.wait(0.1) -- Wait before retrying if no servers are available
         end
     end
 end
