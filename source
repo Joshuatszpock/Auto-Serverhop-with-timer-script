@@ -109,8 +109,8 @@ local function serverHop()
             end)
 
             if success then
-                statusLabel.Text = "Successful! Joining server..." -- Update status on success
-                break -- Exit the loop if teleportation is successful
+                statusLabel.Text = "Successful! Attempting to join server..." -- Update status on success
+                task.wait(0.1)
             else
                 statusLabel.Text = "Failed. Retrying serverhop..." -- Update status on failure
                 task.wait(0.1) -- Wait before retrying
