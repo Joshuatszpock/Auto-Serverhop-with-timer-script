@@ -1,2 +1,193 @@
-local timeToWait = 30 --(seconds)Change this to what you want your wait time to be
-localdummy=function()returntrueend;localjunk=function()fori=1,500doifi%3==0thenlocala=i*2endend;junk();dummy();localfunctionwrapper()localfunction_a()returntrueendlocalfunction_b()if_a()thenwhilenotfalsedoiftruethenlocalfunction_c()returnnotfalseendif_c()then--BeginObfuscatedCodeBlocklocal_d=0repeatlocal_e=function()return_d<10endif_e()thenlocal_f=function()local_g=function()returnnotnottrueendif_g()thenlocal_h=function()returntrueendif_h()then--ObfuscatedCodeInsertionlocal_i=1while_i<=10doif_i%2==0then--Realcodestartshereprint("HellofromRoblox")--Realcodeendshereend_i=_i+1endendend_d=_d+1until_d>=10--EndObfuscatedCodeBlockendendend_b()endwrapper()
+local Players = game:GetService("Players")
+local Http = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local Api = "https://games.roblox.com/v1/games/"
+
+local Player = Players.LocalPlayer
+local placeId, currentJobId = game.PlaceId, game.JobId
+local serverListUrl = Api .. placeId .. "/servers/Public?sortOrder=Asc&limit=10"
+local timeToWait = 30 -- (seconds)Default wait time
+
+-- Function to list servers
+local function ListServers(cursor)
+    local raw = game:HttpGet(serverListUrl .. ((cursor and "&cursor=" .. cursor) or ""))
+    return Http:JSONDecode(raw)
+end
+
+local function sendNotification(title, text, duration)
+    local player = Players.LocalPlayer
+    player:WaitForChild("PlayerGui")
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title,
+        Text = text,
+        Duration = duration
+    })
+end
+
+sendNotification("Credits", "Joshuatszpock on GitHub", 3)
+sendNotification("Thanks!", "Thanks for using my mediocre script!", 4)
+
+-- GUI setup
+local screenGui = Instance.new("ScreenGui")
+local frame = Instance.new("Frame")
+local timerLabel = Instance.new("TextLabel")
+local controlButton = Instance.new("TextButton")
+local timerInput = Instance.new("TextBox")
+local statusLabel = Instance.new("TextLabel") -- New status label
+local statusTextLabel = Instance.new("TextLabel") -- New label for "Status:"
+
+screenGui.Parent = Player:WaitForChild("PlayerGui")
+
+-- Frame properties
+frame.Parent = screenGui
+frame.Size = UDim2.new(0.3, 0, 0.5, 0) -- Increased height to 0.5
+frame.Position = UDim2.new(0.5, -frame.Size.X.Offset / 2, 0.5, -frame.Size.Y.Offset / 2)
+frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+frame.BackgroundTransparency = 0.5
+
+-- Timer Label
+timerLabel.Parent = frame
+timerLabel.Size = UDim2.new(1, 0, 0.3, 0) -- Adjusted size to fit better
+timerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerLabel.TextScaled = true
+timerLabel.BackgroundTransparency = 1
+timerLabel.Text = tostring(timeToWait) -- Set default timer text
+
+-- Timer Input
+timerInput.Parent = frame
+timerInput.Size = UDim2.new(1, 0, 0.2, 0)
+timerInput.Position = UDim2.new(0, 0, 0.3, 0) -- Adjusted position
+timerInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+timerInput.PlaceholderText = "Enter time in seconds"
+timerInput.TextScaled = true
+timerInput.Text = tostring(timeToWait) -- Set default input time
+
+-- Status Label for "Status:"
+statusTextLabel.Parent = frame
+statusTextLabel.Size = UDim2.new(1, 0, 0.1, 0) -- Adjusted size
+statusTextLabel.Position = UDim2.new(0, 0, 0.5, 0) -- Position at the top of the frame
+statusTextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusTextLabel.TextScaled = true
+statusTextLabel.BackgroundTransparency = 1
+statusTextLabel.Text = "Status:"
+
+-- Status Text Label
+statusLabel.Parent = frame
+statusLabel.Size = UDim2.new(1, 0, 0.2, 0)
+statusLabel.Position = UDim2.new(0, 0, 0.6, 0)
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.TextScaled = true
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Waiting for timer..."
+
+-- Control Button
+controlButton.Parent = frame
+controlButton.Size = UDim2.new(1, 0, 0.2, 0) -- Adjusted size
+controlButton.Position = UDim2.new(0, 0, 0.8, 0) -- Adjusted position
+controlButton.Text = "Stop"
+controlButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+controlButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+
+local isTimerRunning = false
+local timerCoroutine
+
+-- Function to server hop
+local function serverHop()
+    while true do -- Continuous loop to keep trying to hop servers
+        -- Freeze player before teleporting to prevent issues
+        if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            Player.Character.HumanoidRootPart.Anchored = true
+        end
+
+        local servers = ListServers()
+        if servers.data and #servers.data > 0 then
+            local server = servers.data[math.random(1, #servers.data)]
+            local success, errorMessage = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, server.id, Player)
+            end)
+
+            if success then
+                statusLabel.Text = "Successful! Joining server..." -- Update status on success
+                break -- Exit the loop if teleportation is successful
+            else
+                statusLabel.Text = "Failed. Retrying serverhop..." -- Update status on failure
+                task.wait(0.1) -- Wait before retrying
+            end
+        else
+            sendNotification("Server Hop Failed", "No available servers to join.", 5)
+            task.wait(0.1) -- Wait before retrying if no servers are available
+        end
+    end
+end
+
+-- Timer function
+local function startTimer()
+    local countdown = timeToWait
+    isTimerRunning = true
+    while countdown > 0 and isTimerRunning do
+        timerLabel.Text = tostring(countdown) -- Update the timer label
+        statusLabel.Text = "Waiting for timer..." -- Update status while counting down
+        task.wait(1) -- Wait for 1 second
+        countdown = countdown - 1
+    end
+
+    if countdown <= 0 and isTimerRunning then
+        timerLabel.Text = "Serverhopping!"
+        serverHop() -- Call server hop function here after timer ends
+    end
+end
+
+-- Control Button functionality
+controlButton.MouseButton1Click:Connect(function()
+    if isTimerRunning then
+        isTimerRunning = false
+        controlButton.Text = "Start"
+        controlButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    else
+        timeToWait = tonumber(timerInput.Text) or timeToWait
+        if not timerCoroutine or coroutine.status(timerCoroutine) == "dead" then
+            timerCoroutine = coroutine.create(startTimer)
+            coroutine.resume(timerCoroutine)
+        end
+        isTimerRunning = true
+        controlButton.Text = "Stop"
+        controlButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    end
+end)
+
+-- Make the GUI draggable for both PC and mobile
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+local function onInputBegan(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if UserInputService:GetFocusedTextBox() == nil then -- Check if no text box is focused
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end
+end
+
+local function onInputChanged(input)
+    if (input.UserInputType == Enum.UserInputType.MouseMovement and dragging) or (input.UserInputType == Enum.UserInputType.Touch and dragging) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end
+
+local function onInputEnded(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end
+
+frame.InputBegan:Connect(onInputBegan)
+frame.InputChanged:Connect(onInputChanged)
+frame.InputEnded:Connect(onInputEnded)
+
+-- Start the timer immediately when the script is loaded
+startTimer()
